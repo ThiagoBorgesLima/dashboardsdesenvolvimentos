@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Dashboard de Desenvolvimentos (CSV)</title>
+<!-- Plotly for charts -->
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<!-- PapaParse for CSV parsing -->
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+    :root{
+      --bg:#f3f4f6;
+      --card:#ffffff;
+      --muted:#374151;
+      --text:#020617;
+      --border:#d1d5db;
+      --accent:#1d4ed8;
+      --warn:#ca8a04;
+      --bad:#b91c1c;
+      --good:#15803d;
+      --shadow: 0 8px 22px rgba(0,0,0,.10);
+      --radius:14px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial;
+    }
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:#f3f4f6;
+      color:var(--text);
+      font-family:var(--sans);
+    }
+    .wrap{max-width:1200px; margin:24px auto; padding:0 16px 40px;}
+    header{
+      display:flex; gap:16px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;
+      margin-bottom:16px;
+    }
+    .title h1{margin:0; font-size:22px; letter-spacing:.2px}
+    .title p{margin:6px 0 0; color:var(--muted); font-size:13px; line-height:1.35}
+    .bar{
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:flex-end;
+    }
+    .btn{
+      background: rgba(110,168,255,.12);
+      border:1px solid rgba(110,168,255,.28);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      font-weight:600;
+      font-size:13px;
+    }
+    .btn:hover{filter:brightness(1.08)}
+    .btn.secondary{
+      background: rgba(255,255,255,.06);
+      border-color: var(--border);
+      color: var(--text);
+      font-weight:600;
+    }
+
+    .grid{display:grid; grid-template-columns:1fr; gap:14px;}
+    @media (max-width: 980px){
+      .grid{display:grid; grid-template-columns:1fr; gap:14px;}
+    }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding:14px;
+      overflow:hidden;
+    }
+    .card h2{
+      margin:0 0 10px;
+      font-size:14px;
+      color: var(--muted);
+      font-weight:700;
+      letter-spacing:.4px;
+      text-transform:uppercase;
+    }
+    .filters{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+    }
+    @media (max-width: 520px){
+      .filters{grid-template-columns: 1fr}
+    }
+    label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px}
+    select, input[type="text"]{
+      width:100%;
+      background: rgba(0,0,0,.25);
+      border:1px solid var(--border);
+      color: var(--text);
+      padding:10px 10px;
+      border-radius: 12px;
+      outline:none;
+    }
+    input[type="file"]{
+      width:100%;
+      background: rgba(0,0,0,.25);
+      border:1px dashed rgba(255,255,255,.25);
+      color: var(--muted);
+      padding:10px;
+      border-radius: 12px;
+    }
+    .kpis{
+      display:grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap:10px;
+      margin-top:10px;
+    }
+    @media (max-width: 980px){
+      .kpis{grid-template-columns: repeat(2, 1fr);}
+    }
+    .kpi{
+      background: rgba(0,0,0,.22);
+      border:1px solid var(--border);
+      border-radius: 14px;
+      padding:10px 12px;
+    }
+    .kpi .k{font-size:11px; color:var(--muted); margin-bottom:6px}
+    .kpi .v{font-size:18px; font-weight:800; letter-spacing:.2px}
+    .kpi .s{font-size:12px; color:var(--muted); margin-top:2px}
+
+    .split{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:14px;
+      margin-top:14px;
+    }
+    @media (max-width: 980px){
+      .split{grid-template-columns:1fr}
+    }
+
+    .tableWrap{overflow:auto; border-radius: 14px; border:1px solid var(--border);}
+    table{width:100%; border-collapse:collapse; font-size:13px; min-width: 980px;}
+    thead th{
+      position:sticky; top:0;
+      background: rgba(10,18,32,.92);
+      backdrop-filter: blur(8px);
+      text-align:left;
+      padding:10px 10px;
+      border-bottom:1px solid var(--border);
+      color: var(--muted);
+      font-weight:800;
+      text-transform:uppercase;
+      letter-spacing:.35px;
+      font-size:11px;
+      white-space:nowrap;
+    }
+    tbody td{
+      padding:9px 10px;
+      border-bottom:1px solid rgba(255,255,255,.06);
+      vertical-align:top;
+    }
+    tbody tr:hover{background: rgba(255,255,255,.04)}
+    .pill{
+      display:inline-block;
+      padding:3px 8px;
+      border-radius:999px;
+      font-size:11px;
+      font-weight:800;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      white-space:nowrap;
+    }
+    .pill.good{border-color: rgba(53,208,127,.45); background: rgba(53,208,127,.12)}
+    .pill.bad{border-color: rgba(255,107,107,.55); background: rgba(255,107,107,.14)}
+    .pill.warn{border-color: rgba(255,207,90,.55); background: rgba(255,207,90,.12)}
+    .mono{font-family: var(--mono)}
+    .hint{color:var(--muted); font-size:12px; margin-top:8px; line-height:1.35}
+    .foot{color:var(--muted); font-size:12px; margin-top:8px}
+    .small{font-size:11px}
+  
+    .scoreCard{padding:12px;}
+    .scoreCard h2{margin-bottom:8px;}
+    details{background: rgba(0,0,0,.03); border:1px solid var(--border); border-radius:12px; padding:10px;}
+    summary{cursor:pointer; color: var(--text); font-size:13px;}
+    summary::-webkit-details-marker{display:none}
+
+  </style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<div class="title">
+<h1>Dashboard de Desenvolvimentos (Atualizável via CSV)</h1>
+<p>
+          Objetivo: visualizar <b>desenvolvimentos por máquina ao longo do tempo</b> e identificar <b>posições com maior necessidade de desenvolvimento</b>.
+          <br/>Dica: salve este arquivo HTML e, ao abrir, carregue o CSV atualizado no seletor abaixo.
+        </p>
+</div>
+<div class="bar">
+<button class="btn secondary" id="btnDemo">Carregar exemplo (seu CSV atual)</button>
+<button class="btn" id="btnExport">Exportar tabela filtrada (CSV)</button>
+</div>
+</header>
+
+<div class="grid">
+<div class="card" style="; grid-column: 1 / -1; height: 550px;">
+<h2>Entrada e filtros</h2>
+<div class="filters">
+<div>
+<label>Arquivo CSV (delimitador <span class="mono">;</span>)</label>
+<input accept=".csv" id="fileInput" type="file" style="width: 200px; height: 28px; font-size: 12px;"/>
+<div class="hint small">
+              Este dashboard tenta localizar automaticamente a linha de cabeçalho (onde aparece “Posição”). Se você mudar o layout do CSV, dá pra ajustar em 2 minutos no código.
+            </div>
+</div>
+<div>
+<label>CSV de previsões (próximos testes de vestimentas)</label>
+<input accept=".csv" id="testsFileInput" type="file" style="width: 200px; height: 28px; font-size: 12px;"/>
+<div class="hint small">
+              Formato esperado: <span class="mono">Data;Máquina;Código;Posição;Vestimenta;Fornecedor</span>. A coluna Máquina pode vir como <span class="mono">1/3/6</span> (o dashboard converte para <span class="mono">MP1/MP3/MP6</span>).
+            </div>
+</div>
+<div>
+<label style="font-size: 20px; opacity: 0.8;">Busca (posição)</label>
+<input id="searchInput" placeholder="Ex.: FELTRO, TELA, BATERIA..." type="text" style="width: 200px; height: 28px; font-size: 12px;"/>
+<div class="hint small">
+              Busca em <b>Posição</b>. Combina com os filtros de máquina e status.
+            </div>
+</div>
+<div>
+<label style="font-size: 20px; opacity: 0.8;">Máquina</label>
+<select id="machineSelect" style="width: 200px; height: 35px; font-size: 12px;"></select>
+</div>
+<div>
+<label style="font-size: 20px; opacity: 0.8;">Status de desenvolvimento</label>
+<select id="statusSelect" style="width: 200px; height: 35px; font-size: 12px;">
+<option value="ALL">Todos</option>
+<option value="NEED">Somente com “Desenv”</option>
+<option value="OK">Somente sem “Desenv”</option>
+</select>
+</div>
+<div>
+<label style="font-size: 20px; opacity: 0.8;">Fornecedor (para leitura rápida)</label>
+<select id="vendorSelect" style="width: 200px; height: 35px; font-size: 12px;">
+<option value="ALL">Todos</option>
+<option value="Andritz">Andritz</option>
+<option value="Albany">Albany</option>
+<option value="Voith">Voith</option>
+</select>
+</div>
+<div>
+<label style="font-size: 20px; opacity: 0.8;">Mês (planejamento)</label>
+<select id="monthSelect" style="width: 200px; height: 35px; font-size: 12px;"></select>
+</div>
+</div>
+<div class="kpis" style="width: 500px; height: 28px; font-size: 12px;">
+<div class="kpi">
+<div class="k">Linhas (filtradas)</div>
+<div class="v" id="kLines" style="width: 130px; height: 28px; font-size: 20px;">0</div>
+<div class="s">posições</div>
+</div>
+<div class="kpi">
+<div class="k">Com “Desenv”</div>
+<div class="v" id="kNeed" style="width: 130px; height: 28px; font-size: 20px;">0</div>
+<div class="s">posições</div>
+</div>
+<div class="kpi">
+<div class="k">Ações no ano</div>
+<div class="v" id="kActions" style="width: 130px; height: 28px; font-size: 20px;">0</div>
+<div class="s">marcação mensal</div>
+</div>
+<div class="kpi">
+<div class="k">Top prioridade</div>
+<div class="v" id="kTop" style="width: 300px; height: 28px; font-size: 20px;">—</div>
+<div class="s">maior “score”</div>
+</div>
+</div>
+</div>
+<div class="card" style="margin-top:14px;; grid-column: 1 / 1;">
+<h2>Próximos testes de vestimentas (previsões)</h2>
+<div class="split">
+<div class="card" style="padding:10px; height: 250px;">
+<h2 style="margin-bottom:2px;">Top posições por necessidade</h2>
+<div id="chartTop" style="height:220px;"></div>
+</div>
+<div class="card" style="padding:12px; height: 250px;">
+<h2 style="margin-bottom:8px;">Planejamento mensal (somatório)</h2>
+<div id="chartMonth" style="height:220px;"></div>
+</div>
+</div>
+</div>
+<div class="card" style="margin-top:14px;; grid-column: 1 / -1;">
+<h2>Próximos testes de vestimentas (previsões)</h2>
+<div class="split">
+<div class="card" style="padding:12px;; grid-column: 1 / -1;">
+<h2 style="margin-bottom:8px;">Linha do tempo (datas)</h2>
+<div id="chartTests" style="height:220px; width:100%;"></div>
+<div class="hint small">Mostra as próximas datas por máquina/posição. Use os filtros acima para focar.</div>
+<div class="card" style="padding:12px; ; grid-column: 1 / -1;">
+<h2 style="margin-bottom:8px;">Agenda filtrada</h2>
+<div class="tableWrap" style="border-radius:14px;">
+<table id="tblTests" style="min-width:120px;">
+<thead><tr id="tblTestsHead"></tr></thead>
+<tbody id="tblTestsBody"></tbody>
+</div>
+</table>
+</div>
+
+</div>
+</div>
+<!--SCORE CALCULATION:
++10 por fornecedor com status 'Desenv' (Andritz / Albany / Voith)
++1 por cada mês marcado com '1' (ação planejada)
++2 se existir data de troca registrada-->
+<div class="foot">
+<div class="small">Layout pensado pra abrir no navegador (Chrome/Edge) e atualizar só trocando o CSV.</div>
+</div>
+</div>
+</div>
+<div class="card" style="margin-top:14px;">
+<h2>Detalhe por posição</h2>
+<div class="tableWrap">
+<table id="tbl">
+<thead><tr id="tblHead"></tr></thead>
+<tbody id="tblBody"></tbody>
+</table>
+</div>
+<div class="hint">
+        Você pode filtrar por máquina, buscar por posição, e exportar a tabela filtrada para CSV.
+      </div>
+</div>
+
+<script>
+  const MONTHS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+
+  /** state */
+  let rows = [];           // normalized rows
+  let filtered = [];       // filtered rows
+  let headers = [];        // original headers
+  let machineHeaderName = "Máquina"; // inferred
+  let positionHeader = "Posição";
+  let vendors = ["Andritz","Albany","Voith"];
+
+  let testsRows = [];      // rows from 2nd CSV (test forecasts)
+  let testsByKey = new Map(); // key = "MPx||Posição" -> sorted Date[]
+
+
+  const el = (id)=>document.getElementById(id);
+
+  function normalizeText(s){
+    return (s ?? "").toString().trim();
+  }
+
+  function parseBRDate(s){
+    const t = normalizeText(s);
+    const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(t);
+    if(!m) return null;
+    const dd = Number(m[1]), mm = Number(m[2]), yyyy = Number(m[3]);
+    return new Date(yyyy, mm-1, dd);
+  }
+  function formatBRDate(d){
+    if(!(d instanceof Date)) return "";
+    const dd = String(d.getDate()).padStart(2,"0");
+    const mm = String(d.getMonth()+1).padStart(2,"0");
+    const yy = d.getFullYear();
+    return `${dd}/${mm}/${yy}`;
+  }
+  function machineNormalize(m){
+    const t = normalizeText(m);
+    if(!t) return "";
+    const low = t.toLowerCase();
+    if (low.startsWith("mp")) return t.toUpperCase();
+    if (/^\d+$/.test(t)) return "MP"+t;
+    return t.toUpperCase();
+  }
+
+  function isDesenv(s){
+    return normalizeText(s).toLowerCase() === "desenv";
+  }
+  function hasAnyDesenv(r){
+    return vendors.some(v => isDesenv(r[v]));
+  }
+  function monthActionsCount(r){
+    let n = 0;
+    for (const m of MONTHS){
+      const v = normalizeText(r[m]);
+      if (v === "1" || v === "x" || v.toLowerCase() === "sim") n++;
+    }
+    return n;
+  }
+  function hasTrocaDate(r){
+    // “Trocas” vem como número + depois várias colunas com datas. No parse, guardamos trocaDates[]
+    return (r.trocaDates?.length ?? 0) > 0;
+  }
+  function priorityScore(r){
+    let score = 0;
+    for (const v of vendors) if (isDesenv(r[v])) score += 10;
+    score += monthActionsCount(r);
+    if (hasTrocaDate(r)) score += 2;
+    return score;
+  }
+  function pillForVendorValue(v){
+    const t = normalizeText(v);
+    if (!t) return "";
+    const low = t.toLowerCase();
+    if (low === "sim") return `<span class="pill good">Sim</span>`;
+    if (low === "desenv") return `<span class="pill bad">Desenv</span>`;
+    if (low === "não" || low === "nao") return `<span class="pill">Não</span>`;
+    return `<span class="pill">${t}</span>`;
+  }
+
+  function setSelectOptions(selectEl, items, includeAllLabel="Todos"){
+    const cur = selectEl.value;
+    selectEl.innerHTML = "";
+    if (includeAllLabel){
+      const o = document.createElement("option");
+      o.value = "ALL";
+      o.textContent = includeAllLabel;
+      selectEl.appendChild(o);
+    }
+    for (const it of items){
+      const o = document.createElement("option");
+      o.value = it;
+      o.textContent = it;
+      selectEl.appendChild(o);
+    }
+    // keep if possible
+    if ([...selectEl.options].some(o=>o.value===cur)) selectEl.value = cur;
+  }
+
+  function findHeaderRow(parsed){
+    // returns index of row that contains "Posição"
+    for (let i=0;i<parsed.data.length;i++){
+      const row = parsed.data[i] || [];
+      if (row.some(c => normalizeText(c).toLowerCase() === "posição" || normalizeText(c).toLowerCase() === "posicao")) return i;
+    }
+    return -1;
+  }
+
+  function parseCSVText(text){
+    return new Promise((resolve,reject)=>{
+      Papa.parse(text, {
+        delimiter: ";",
+        skipEmptyLines: true,
+        complete: (res)=> resolve(res),
+        error: (err)=> reject(err)
+      });
+    });
+  }
+
+  function normalizeFromParsed(parsed){
+    const idx = findHeaderRow(parsed);
+    if (idx === -1) throw new Error("Não encontrei a linha de cabeçalho (preciso de uma coluna chamada “Posição”).");
+
+    headers = parsed.data[idx].map(h => normalizeText(h));
+    // infer machine header: often first header is MP1 / MP3 etc.
+    const firstHeader = headers[0] || "Máquina";
+    machineHeaderName = firstHeader;
+
+    // Build objects for lines after header
+    const dataLines = parsed.data.slice(idx+1)
+      .filter(r => r && r.some(c => normalizeText(c) !== "")); // non-empty
+
+    // Find month indices
+    const monthIdx = {};
+    for (const m of MONTHS){
+      monthIdx[m] = headers.findIndex(h => h === m);
+    }
+    const trocaIdx = headers.findIndex(h => normalizeText(h).toLowerCase() === "trocas");
+    const uTrocaIdx = headers.findIndex(h => normalizeText(h).toLowerCase() === "u.troca");
+    const vidaIdx = headers.findIndex(h => normalizeText(h).toLowerCase() === "vida estimada");
+
+    // Some files have extra unnamed columns after "Trocas" with dates.
+    // We’ll treat columns after "Trocas" as potential dates if they parse like dd/mm/yyyy.
+    const dateLike = (s)=> /^\d{2}\/\d{2}\/\d{4}$/.test(normalizeText(s));
+
+    let currentMachine = firstHeader; // if first column empty, assume first header as machine name
+    const out = [];
+
+    for (const line of dataLines){
+      const obj = {};
+      for (let c=0;c<headers.length;c++){
+        obj[headers[c] || `col_${c}`] = normalizeText(line[c]);
+      }
+
+      const machineCell = normalizeText(obj[firstHeader]);
+      if (machineCell) currentMachine = machineCell;
+      obj.Máquina = currentMachine;
+
+      // If "Posição" is empty but we have a value under first header, sometimes that is actually machine row; ignore
+      const pos = normalizeText(obj["Posição"] || obj["Posicao"]);
+      if (!pos) continue;
+      obj.Posição = pos;
+
+      // vendors present?
+      for (const v of vendors){
+        if (!(v in obj)) obj[v] = "";
+      }
+
+      // collect troca dates from trailing columns
+      obj.trocaDates = [];
+      if (trocaIdx !== -1){
+        for (let c=trocaIdx+1;c<headers.length;c++){
+          const val = normalizeText(line[c]);
+          if (dateLike(val)) obj.trocaDates.push(val);
+        }
+      }
+
+      // Clean numeric fields
+      obj["Vida estimada"] = normalizeText(obj["Vida estimada"]);
+      obj["U.Troca"] = normalizeText(obj["U.Troca"]);
+
+      out.push(obj);
+    }
+
+    return out;
+  }
+
+
+  async function loadTestsFromText(text){
+    const parsed = await parseCSVText(text);
+    const hdrIdx = parsed.data.findIndex(r => r && normalizeText(r[0]).toLowerCase() === "data");
+    const start = hdrIdx >= 0 ? hdrIdx : 0;
+    const headers2 = (parsed.data[start] || []).map(h=>normalizeText(h));
+    const lines = parsed.data.slice(start+1).filter(r=>r && r.some(c=>normalizeText(c)!==""));
+
+    const col = (name)=> headers2.findIndex(h => h.toLowerCase() === name.toLowerCase());
+    const iData = col("Data");
+    const iMac  = col("Máquina");
+    const iPos  = col("Posição");
+    const iCod  = col("Código");
+    const iVes  = col("Vestimenta");
+    const iFor  = col("Fornecedor");
+
+    testsRows = [];
+    testsByKey = new Map();
+
+    for (const ln of lines){
+      const dateObj = parseBRDate(ln[iData]);
+      const mac = machineNormalize(ln[iMac]);
+      if (!dateObj || !mac) continue;
+
+      let pos = normalizeText(ln[iPos]);
+      const cod = normalizeText(ln[iCod]);
+      const ves = normalizeText(ln[iVes]);
+      const forn = normalizeText(ln[iFor]);
+
+      if (pos === "#N/D" || pos === "#N/A") pos = "";
+      const matchPos = pos || ves;
+
+      const row = {Data: formatBRDate(dateObj), DataObj: dateObj, Máquina: mac, Posição: matchPos, Código: cod, Vestimenta: ves, Fornecedor: forn};
+      testsRows.push(row);
+
+      if (matchPos){
+        const key = `${mac}||${matchPos}`;
+        const arr = testsByKey.get(key) || [];
+        arr.push(dateObj);
+        testsByKey.set(key, arr);
+      }
+    }
+
+    for (const [k,arr] of testsByKey.entries()){
+      arr.sort((a,b)=>a-b);
+      testsByKey.set(k, arr);
+    }
+  }
+
+  function nextTestDate(machine, pos){
+    const key = `${machine}||${pos}`;
+    const arr = testsByKey.get(key);
+    if (!arr || !arr.length) return "";
+    return formatBRDate(arr[0]);
+  }
+
+
+  function applyFilters(){
+    const m = el("machineSelect").value;
+    const status = el("statusSelect").value;
+    const vendor = el("vendorSelect").value;
+    const month = el("monthSelect").value;
+    const q = normalizeText(el("searchInput").value).toLowerCase();
+
+    filtered = rows.filter(r=>{
+      if (m !== "ALL" && r.Máquina !== m) return false;
+
+      if (status === "NEED" && !hasAnyDesenv(r)) return false;
+      if (status === "OK" && hasAnyDesenv(r)) return false;
+
+      if (vendor !== "ALL"){
+        // If selecting a vendor, keep rows where that vendor is "Desenv" OR at least non-empty (useful)
+        const vv = normalizeText(r[vendor]).toLowerCase();
+        if (!vv) return false;
+      }
+
+      if (month !== "ALL"){
+        const v = normalizeText(r[month]);
+        if (!(v === "1" || v.toLowerCase() === "x" || v.toLowerCase() === "sim")) return false;
+      }
+
+      if (q){
+        if (!normalizeText(r.Posição).toLowerCase().includes(q)) return false;
+      }
+
+      return true;
+    });
+
+    // update KPIs, charts, table
+    renderKPIs();
+    renderCharts();
+    renderTable();
+    renderTests();
+  }
+
+  function renderKPIs(){
+    el("kLines").textContent = filtered.length.toString();
+
+    const need = filtered.filter(hasAnyDesenv).length;
+    el("kNeed").textContent = need.toString();
+
+    const actions = filtered.reduce((acc,r)=> acc + monthActionsCount(r), 0);
+    el("kActions").textContent = actions.toString();
+
+    const top = [...filtered].sort((a,b)=> priorityScore(b)-priorityScore(a))[0];
+    el("kTop").textContent = top ? `${top.Máquina} • ${top.Posição}` : "—";
+  }
+
+  function renderCharts(){
+    // chartTop: top 12 by score
+    const top = [...filtered]
+      .map(r => ({ key: `${r.Máquina} — ${r.Posição}`, score: priorityScore(r), need: vendors.filter(v=>isDesenv(r[v])).length, actions: monthActionsCount(r) }))
+      .sort((a,b)=> b.score - a.score)
+      .slice(0, 12);
+
+    const x = top.map(d=>d.score);
+    const y = top.map(d=>d.key);
+
+    Plotly.newPlot("chartTop", [{
+      type:"bar",
+      orientation:"h",
+      x, y,
+      hovertemplate: "<b>%{y}</b><br>Score: %{x}<extra></extra>"
+    }], {
+      margin:{l:180,r:10,t:10,b:30},
+      paper_bgcolor:"rgba(0,0,0,0)",
+      plot_bgcolor:"rgba(0,0,0,0)",
+      font:{color:"#020617", size:14},
+      xaxis:{gridcolor:"rgba(255,255,255,.08)", zerolinecolor:"rgba(255,255,255,.12)"},
+      yaxis:{gridcolor:"rgba(255,255,255,.06)"}
+    }, {displayModeBar:false, responsive:true});
+
+    // chartMonth: total actions per month
+    const mCounts = MONTHS.map(m => filtered.reduce((acc,r)=>{
+      const v = normalizeText(r[m]);
+      return acc + ((v === "1" || v.toLowerCase()==="x" || v.toLowerCase()==="sim") ? 1 : 0);
+    },0));
+
+    Plotly.newPlot("chartMonth", [{
+      type:"bar",
+      x: MONTHS,
+      y: mCounts,
+      hovertemplate: "<b>%{x}</b><br>Ações: %{y}<extra></extra>"
+    }], {
+      margin:{l:45,r:10,t:10,b:40},
+      paper_bgcolor:"rgba(0,0,0,0)",
+      plot_bgcolor:"rgba(0,0,0,0)",
+      font:{color:"#020617", size:14},
+      xaxis:{gridcolor:"rgba(255,255,255,.06)"},
+      yaxis:{gridcolor:"rgba(255,255,255,.08)", zerolinecolor:"rgba(255,255,255,.12)"}
+    }, {displayModeBar:false, responsive:true});
+  }
+
+  function renderTable(){
+    const cols = ["Máquina","Posição",...vendors,"U.Troca","Vida estimada","Próx. teste","Score","Ações (meses)","Trocas (datas)"];
+    // head
+    const head = el("tblHead");
+    head.innerHTML = cols.map(c=>`<th>${c}</th>`).join("");
+
+    const body = el("tblBody");
+    const sorted = [...filtered].sort((a,b)=> priorityScore(b)-priorityScore(a));
+    body.innerHTML = sorted.map(r=>{
+      const score = priorityScore(r);
+      const actions = monthActionsCount(r);
+      const trocaDates = (r.trocaDates||[]).join(" • ");
+      return `<tr>
+        <td class="mono">${r.Máquina}</td>
+        <td><b>${r.Posição}</b></td>
+        <td>${pillForVendorValue(r.Andritz)}</td>
+        <td>${pillForVendorValue(r.Albany)}</td>
+        <td>${pillForVendorValue(r.Voith)}</td>
+        <td class="mono">${normalizeText(r["U.Troca"]) || "—"}</td>
+        <td class="mono">${normalizeText(r["Vida estimada"]) || "—"}</td>
+        <td class="mono">${nextTestDate(r.Máquina, r.Posição) || "—"}</td>
+        <td class="mono"><b>${score}</b></td>
+        <td class="mono">${actions}</td>
+        <td class="mono">${trocaDates || "—"}</td>
+      </tr>`;
+    }).join("");
+  }
+
+
+  function renderTests(){
+    const head = el("tblTestsHead");
+    const body = el("tblTestsBody");
+    if (!testsRows || testsRows.length === 0){
+      try{ Plotly.purge("chartTests"); }catch(e){}
+      head.innerHTML = "<th>Data</th><th>Máquina</th><th>Posição</th><th>Código</th><th>Fornecedor</th>";
+      body.innerHTML = `<tr><td colspan="5" class="hint">Carregue o 2º CSV para visualizar as previsões.</td></tr>`;
+      return;
+    }
+
+    const machineSel = el("machineSelect").value;
+    const q = normalizeText(el("searchInput").value).toLowerCase();
+
+    const testsFiltered = testsRows.filter(t=>{
+      if (machineSel !== "ALL" && t.Máquina !== machineSel) return false;
+      if (q && !(normalizeText(t.Posição).toLowerCase().includes(q))) return false;
+      return true;
+    }).sort((a,b)=>a.DataObj-b.DataObj);
+
+    // Labels curtos (onde troca) e detalhes no hover (o que troca)
+    const yLabels = testsFiltered.map(t=>{
+      const pos = (t.Posição || "").trim();
+      return `${t.Máquina} — ${pos || "—"}`;
+    });
+    const xDates = testsFiltered.map(t=> t.DataObj);
+    const custom = testsFiltered.map(t=>[t.Posição||"", t.Vestimenta||"", t.Código||"", t.Fornecedor||""]);
+    
+    Plotly.newPlot("chartTests", [{
+      type:"scatter",
+      mode:"markers",
+      x: xDates,
+      y: testsFiltered.map(t=>t.Máquina),
+      customdata: custom,
+     
+      hovertemplate:
+        "<b>Máquina:</b> %{y}<br>" +
+        "<b>Data:</b> %{x|%d/%m/%Y}<br>" +
+        "<b>Vestimenta:</b> %{customdata[1]}<extra></extra><br>" +
+        "<b>Fornecedor:</b> %{customdata[3]}",
+
+      marker:{size:9, opacity:0.8}
+    }],{
+      margin:{l:120,r:10,t:10,b:60},
+      paper_bgcolor:"rgba(0,0,0,0)",
+      plot_bgcolor:"rgba(0,0,0,0)",
+      font:{color:"#020617", size:13},
+      xaxis:{
+        type:"date",
+        tickformat:"%d/%m",
+        gridcolor:"rgba(2,6,23,.08)",
+        rangeslider:{visible:false}
+      },
+      yaxis:{
+        type:"category",
+        automargin:true,
+        gridcolor:"rgba(2,6,23,.04)"
+      }
+    }, {displayModeBar:false, responsive:true});head.innerHTML = "<th>Data</th><th>Máquina</th><th>Posição</th><th>Código</th><th>Fornecedor</th>";
+    body.innerHTML = testsFiltered.slice(0, 200).map(t=>`
+      <tr>
+        <td class="mono"><b>${t.Data}</b></td>
+        <td class="mono">${t.Máquina}</td>
+        <td>${t.Posição || (t.Vestimenta||"—")}</td>
+        <td class="mono">${t.Código || "—"}</td>
+        <td>${t.Fornecedor || "—"}</td>
+      </tr>
+    `).join("");
+  }
+
+
+  function exportFilteredCSV(){
+    const cols = ["Máquina","Posição",...vendors,"U.Troca","Vida estimada","ProxTeste",...MONTHS,"Score","TrocaDatas"];
+    const out = filtered.map(r=>{
+      const obj = {};
+      for (const c of cols){
+        if (c==="Score") obj[c] = priorityScore(r);
+        else if (c==="TrocaDatas") obj[c] = (r.trocaDates||[]).join(" | ");
+        else if (c==="ProxTeste") obj[c] = nextTestDate(r.Máquina, r.Posição);
+        else obj[c] = normalizeText(r[c]);
+      }
+      return obj;
+    });
+
+    const csv = Papa.unparse(out, {delimiter:";", quotes:true});
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "dashboard_filtrado.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  function initSelectors(){
+    const machines = Array.from(new Set(rows.map(r=>r.Máquina))).sort();
+    setSelectOptions(el("machineSelect"), machines, "Todas");
+
+    setSelectOptions(el("monthSelect"), MONTHS, "Todos");
+  }
+
+  function attachEvents(){
+    el("machineSelect").addEventListener("change", applyFilters);
+    el("statusSelect").addEventListener("change", applyFilters);
+    el("vendorSelect").addEventListener("change", applyFilters);
+    el("monthSelect").addEventListener("change", applyFilters);
+    el("searchInput").addEventListener("input", ()=>{ window.clearTimeout(window.__qT); window.__qT=setTimeout(applyFilters, 120); });
+
+    el("btnExport").addEventListener("click", exportFilteredCSV);
+
+    el("fileInput").addEventListener("change", async (e)=>{
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      await loadFromText(text);
+    });
+
+    el("testsFileInput").addEventListener("change", async (e)=>{
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      await loadTestsFromText(text);
+      applyFilters();
+    });
+
+    el("btnDemo").addEventListener("click", async ()=>{
+      // placeholder: we replace this content at build time if available
+      if (!window.__DEMO_CSV_TEXT){
+        alert("Sem CSV embutido. Use o seletor para carregar o arquivo.");
+        return;
+      }
+      await loadFromText(window.__DEMO_CSV_TEXT);
+      if (window.__TESTS_CSV_TEXT){
+        await loadTestsFromText(window.__TESTS_CSV_TEXT);
+      }
+      applyFilters();
+    });
+  }
+
+  async function loadFromText(text){
+    const parsed = await parseCSVText(text);
+    rows = normalizeFromParsed(parsed);
+    initSelectors();
+    applyFilters();
+  }
+
+  // boot
+  attachEvents();
+  // set default selects
+  setSelectOptions(el("machineSelect"), [], "Todas");
+  setSelectOptions(el("monthSelect"), MONTHS, "Todos");
+
+</script>
+<!-- The current CSV can be embedded here as demo to allow 1-click load -->
+<script>
+  window.__DEMO_CSV_TEXT = `﻿;REAL;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;2026;;;;;2;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+MP1;Posição;Andritz;Albany;Voith;U.Troca;Vida estimada;Jan;Fev;Mar;Abr;Mai;Jun;Jul;Ago;Set;Out;Nov;Dez;Trocas;;;;;;;;;;;;;;;
+;TELA FORMADORA;Sim;Sim;Não;21/01/2026;55;;1;;1;;1;1;;1;;1;;6;17/03/2026;11/05/2026;05/07/2026;29/08/2026;23/10/2026;17/12/2026;;;;;;;;;
+;FELTRO PICK-UP;Desenv;Não;Sim;26/01/2026;33;1;1;;1;1;1;1;1;1;1;1;1;10;28/02/2026;02/04/2026;05/05/2026;07/06/2026;10/07/2026;12/08/2026;14/09/2026;17/10/2026;19/11/2026;22/12/2026;;;;;
+;FELTRO 2ª PRENSA;Sim;Não;Sim;26/01/2026;58;1;;1;;1;;1;;1;;1;;5;25/03/2026;22/05/2026;19/07/2026;15/09/2026;12/11/2026;;;;;;;;;;
+;1ª BATERIA SUPERIOR;Sim;Sim;Não;13/08/2025;294;;;;;;1;;;;;;;1;03/06/2026;;;;;;;;;;;;;;
+;3ª BATERIA SUPERIOR;Sim;Sim;Não;29/01/2025;380;;1;;;;;;;;;;;1;13/02/2026;;;;;;;;;;;;;;
+;4ª BATERIA SUPERIOR;Sim;Sim;Não;03/07/2025;329;;;;;1;;;;;;;;1;28/05/2026;;;;;;;;;;;;;;
+;5ª BATERIA SUPERIOR;Sim;Sim;Não;13/08/2025;215;;;1;;;;;;;1;;;2;16/03/2026;17/10/2026;;;;;;;;;;;;;
+;6ª BATERIA SUPERIOR;Sim;Sim;Não;09/04/2025;360;;;;1;;;;;;;;;1;04/04/2026;;;;;;;;;;;;;;
+;1ª BATERIA INFERIOR;Sim;Sim;Não;13/08/2025;360;;;;;;;;1;;;;;1;08/08/2026;;;;;;;;;;;;;;
+;2ª BATERIA INFERIOR;Sim;Sim;Não;31/07/2025;365;;;;;;;1;;;;;;1;31/07/2026;;;;;;;;;;;;;;
+;3ª BATERIA INFERIOR;Sim;Sim;Não;15/09/2025;380;;;;;;;;;1;;;;1;30/09/2026;;;;;;;;;;;;;;
+;4ª BATERIA INFERIOR;Sim;Sim;Não;20/06/2025;269;;;1;;;;;;;1;;;2;16/03/2026;10/12/2026;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+MP3;Posição;Andritz;Albany;Voith;U.Troca;Vida estimada;Jan;Fev;Mar;Abr;Mai;Jun;Jul;Ago;Set;Out;Nov;Dez;Trocas;;;;;;;;;;;;;;;
+;TELA FORMADORA;Sim;Sim;Desenv;04/11/2025;45;;1;1;;1;1;;1;1;1;;1;9;04/02/2026;21/03/2026;05/05/2026;19/06/2026;03/08/2026;17/09/2026;01/11/2026;16/12/2026;30/01/2027;;;;;;
+;FELTRO PICK-UP;Desenv;Sim;Desenv;04/12/2025;35;1;1;1;1;1;1;1;1;1;1;1;1;10;08/01/2026;12/02/2026;19/03/2026;23/04/2026;28/05/2026;02/07/2026;06/08/2026;10/09/2026;15/10/2026;19/11/2026;24/12/2026;;;;
+;FELTRO 2ª PRENSA;Sim;Sim;Não;08/12/2025;64;;1;;1;;1;;1;;1;;1;6;10/02/2026;15/04/2026;18/06/2026;21/08/2026;24/10/2026;27/12/2026;;;;;;;;;
+;1ª BATERIA INFERIOR;Sim;Sim;Não;09/12/2024;366;;;;;;;;;;;;1;2;10/12/2025;11/12/2026;;;;;;;;;;;;;
+;1ª BATERIA SUPERIOR;Sim;Sim;Não;15/08/2025;418;;;;;;;;;;1;;;1;07/10/2026;;;;;;;;;;;;;;
+;2ª BATERIA INFERIOR;Sim;Sim;Não;15/11/2024;310;;;;;;;1;;;;;;2;21/09/2025;28/07/2026;;;;;;;;;;;;;
+;2ª BATERIA SUPERIOR;Sim;Sim;Não;18/08/2025;315;;;;;;1;;;;;;;1;29/06/2026;;;;;;;;;;;;;;
+;3ª BATERIA INFERIOR;Sim;Sim;Não;28/07/2025;305;;;;;1;;;;;;;;1;29/05/2026;;;;;;;;;;;;;;
+;3ª BATERIA SUPERIOR;Sim;Sim;Não;11/02/2025;348;1;;;;;;;;;;;;1;25/01/2026;;;;;;;;;;;;;;
+;4ª BATERIA SUPERIOR;Sim;Sim;Não;28/05/2025;320;;;;1;;;;;;;;;1;13/04/2026;;;;;;;;;;;;;;
+;4ª BATERIA INFERIOR;Sim;Sim;Não;12/03/2025;285;1;;;;;;;;;;;1;2;22/12/2025;03/10/2026;;;;;;;;;;;;;
+;5ª BATERIA INFERIOR;Sim;Sim;Não;23/04/2025;403;;;;;1;;;;;;;;1;31/05/2026;;;;;;;;;;;;;;
+;5ª BATERIA SUPERIOR;Sim;Sim;Não;21/10/2024;360;1;;;;;;;;;;;1;2;16/10/2025;11/10/2026;;;;;;;;;;;;;
+;6ª BATERIA INFERIOR;Sim;Sim;Não;16/04/2025;320;;;1;;;;;;;;;;1;02/03/2026;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+MP6;Posição;Andritz;Albany;Voith;U.Troca;Vida estimada;Jan;Fev;Mar;Abr;Mai;Jun;Jul;Ago;Set;Out;Nov;Dez;Trocas;;;;;;;;;;;;;;;
+;TELA FORMADORA;Sim;Sim;Não;06/11/2025;124;;1;;;;1;;;;;1;;3;10/02/2026;14/06/2026;16/10/2026;;;;;;;;;;;;
+;FELTRO PICK-UP;Desenv;Sim;Não;08/01/2026;50;1;1;;1;;1;1;;1;;1;1;7;27/02/2026;18/04/2026;07/06/2026;27/07/2026;15/09/2026;04/11/2026;24/12/2026;;;;;;;;
+;FELTRO 2ª PRENSA;Desenv;Sim;Não;02/01/2026;55;;1;;1;;1;;1;;1;1;;6;26/02/2026;22/04/2026;16/06/2026;10/08/2026;04/10/2026;28/11/2026;;;;;;;;;
+;1ª BATERIA SUPERIOR;Sim;Sim;Não;11/12/2025;204;;;;;;;1;;;;;;1;03/07/2026;;;;;;;;;;;;;;
+;2ª BATERIA SUPERIOR;Sim;Sim;Não;11/08/2025;156;1;;;;;1;;;;;;;2;14/01/2026;19/06/2026;;;;;;;;;;;;;
+;3ª BATERIA SUPERIOR;Sim;Sim;Não;26/08/2025;187;;;1;;;;;;1;;;;2;01/03/2026;04/09/2026;;;;;;;;;;;;;
+;4ª BATERIA SUPERIOR;Sim;Sim;Não;06/11/2025;247;;;;;;;1;;;;;;1;11/07/2026;;;;;;;;;;;;;;
+;5ª BATERIA SUPERIOR;Sim;Sim;Não;15/11/2025;334;;;;;;;;;;1;;;1;15/10/2026;;;;;;;;;;;;;;
+;1ª BATERIA INFERIOR;Sim;Sim;Não;14/12/2025;336;;;;;;;;;;;1;;1;15/11/2026;;;;;;;;;;;;;;
+;2ª BATERIA INFERIOR;Sim;Sim;Não;14/08/2025;187;;1;;;;;;1;;;;;2;17/02/2026;23/08/2026;;;;;;;;;;;;;
+;3ª BATERIA INFERIOR;Sim;Sim;Não;27/09/2025;161;;;1;;;;;1;;;;;2;07/03/2026;15/08/2026;;;;;;;;;;;;;
+;4ª BATERIA INFERIOR;Sim;Sim;Não;24/09/2025;206;;;;1;;;;;;;1;;2;18/04/2026;10/11/2026;;;;;;;;;;;;;
+;5ª BATERIA INFERIOR;Sim;Sim;Não;02/09/2025;173;;1;;;;;;1;;;;;2;22/02/2026;14/08/2026;;;;;;;;;;;;;
+;6ª BATERIA INFERIOR;Sim;Sim;Não;02/05/2025;233;1;;;;;;;;1;;;;2;21/12/2025;11/08/2026;;;;;;;;;;;;;
+;7ª BATERIA INFERIOR;Sim;Sim;Não;13/06/2025;197;1;;;;;;;1;;;;;2;27/12/2025;12/07/2026;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+`;
+  window.__TESTS_CSV_TEXT = `﻿Data;Máquina;Código;Posição;Vestimenta;Fornecedor
+26/01/2026;1;2038902;FELTRO PICK-UP;FELTRO PICK-UP;
+17/03/2026;1;2038456;#N/D;#N/D;
+25/03/2026;1;2009144;#N/D;#N/D;
+05/05/2026;1;2038981;#N/D;#N/D;
+04/02/2026;3;2038458;TELA FORMADORA;TELA FORMADORA;
+05/05/2026;3;2041092;#N/D;#N/D;
+18/04/2026;6;2039577;#N/D;#N/D;
+26/02/2026;6;2039578;#N/D;#N/D;
+`;
+</script>
+</body>
+</html>
